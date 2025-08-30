@@ -17,6 +17,7 @@ def json_route():
 
 # Discord Bot 設定
 TOKEN = os.getenv("DISCORD_TOKEN")
+print("DEBUG >> TOKEN:", TOKEN)  # デバッグ確認用
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))  # ←追加
 
 intents = discord.Intents.default()
