@@ -35,3 +35,11 @@ def run_bot():
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     app.run(host="0.0.0.0", port=10000)
+
+@app.route("/notify")
+def notify():
+    channel = bot.get_channel(int(CHANNEL_ID))
+    if channel:
+        asyncio.run_coroutine_threadsafe(channel.send("テスト通知です！"), bot.loop)
+        return "Notification sent!"
+    return "Channel not found."
