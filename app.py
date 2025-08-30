@@ -5,6 +5,7 @@ from flask import Flask, jsonify
 import discord
 from discord.ext import commands
 
+# Flask アプリ
 app = Flask(__name__)
 
 @app.route("/")
@@ -17,10 +18,13 @@ def json_route():
 
 # Discord Bot 設定
 TOKEN = os.getenv("DISCORD_TOKEN")
-print("DEBUG >> TOKEN:", TOKEN)  # デバッグ確認用
-CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))  # ←追加
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 
+# ---- Intent 設定（重要！）----
 intents = discord.Intents.default()
+intents.message_content = True   # Message Content Intent を有効化
+# --------------------------------
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
@@ -31,13 +35,15 @@ async def on_ready():
 async def ping(ctx):
     await ctx.send("Pong!")
 
+# Flask から Discord に通知を送るエンドポイント
 @app.route("/notify")
 def notify():
-    channel = bot.get_channel(CHANNEL_ID)
+    if CHANNEL_ID is None:
+        return "CHANNEL_ID not set in environment."
+
+    channel = bot.get_channel(int(CHANNEL_ID))
     if channel:
-        asyncio.run_coroutine_threadsafe(
-            channel.send("テスト通知です！"), bot.loop
-        )
+        asyncio.run_coroutine_threadsafe(channel.send("テスト通知です！"), bot.loop)
         return "Notification sent!"
     return "Channel not found."
 
