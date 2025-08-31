@@ -25,4 +25,3 @@ jobs:
 
       - name: Run scraper
         run: python scraper.py
-
