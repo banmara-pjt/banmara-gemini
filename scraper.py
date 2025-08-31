@@ -68,3 +68,4 @@ def scrape_events():
 
 if __name__ == "__main__":
     scrape_events()
+print("Scraper finished successfully")
