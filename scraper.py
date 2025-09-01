@@ -70,8 +70,8 @@ def main():
         notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
         return
 
-    new_items = set(item["norm"] for item in new_items_list)
-    diff_norms = new_items - old_items
+    new_set = set(item["norm"] for item in new_items_list)
+    diff_norms = new_set - old_items
     diff_items = [item for item in new_items_list if item["norm"] in diff_norms]
 
     if not diff_items and new_items_list:
@@ -79,8 +79,9 @@ def main():
     elif not new_items_list:
         notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）**")
     else:
+        sorted_diff = sorted(list(diff_items), key=lambda x: x['raw'])
         notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）**")
-        for item in diff_items:
+        for item in sorted_diff:
             notify_discord(f"    - {item['raw']}")
 
     save_state(new_items_list)
