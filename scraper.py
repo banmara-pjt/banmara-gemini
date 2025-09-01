@@ -25,14 +25,14 @@ def get_page_items():
         for entry in soup.select("a[href^='/events/']")[:10]:
             title_element = entry.select_one(".liveEventListTitle")
             date_element = entry.select_one(".itemInfoColumnData")
-            place_element = entry.select(".itemInfoColumnData")[1] if len(entry.select(".itemInfoColumnData")) > 1 else None
+            place_element = entry.select(".itemInfoColumnData")
             
-            if title_element and date_element and place_element:
+            if title_element and date_element:
                 title = title_element.get_text(strip=True)
                 date = date_element.get_text(strip=True)
-                place = place_element.get_text(strip=True)
                 link = entry["href"]
-                items.append(f"{title}|{date}|{place}|{link}")
+                place = place_element[1].get_text(strip=True) if len(place_element) > 1 else ""
+                items.append(f"{title} | {date} | {place} | {link}")
         return items
 
     except Exception as e:
@@ -63,22 +63,21 @@ def main():
     old_items = load_last_state()
 
     if new_items_list is None:
-        notify_discord(f"⚠️ **サイトの形式が変更された可能性があります（収集日時：{current_time}）**\n情報が取得できませんでした。コードの修正が必要かもしれません。")
+        notify_discord(f"⚠️ サイトにアクセスできません（収集日時：{current_time}）")
         return
 
     new_items = set(new_items_list)
     diff = new_items - old_items
 
-    if not diff and new_items:
-        notify_discord(f"ℹ️ 新着はありません（動作は正常です）（収集日時：{current_time}）")
-    elif not new_items:
+    if not new_items_list:
         notify_discord(f"⚠️ データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）")
+    elif not diff:
+        notify_discord(f"ℹ️ 新着はありません（動作は正常です）（収集日時：{current_time}）")
     else:
-        message_lines = [f"✅ 新着があります（収集日時：{current_time}）"]
-        for item in sorted(diff):
-            title, date, place, link = item.split("|")
-            message_lines.append(f"・{title}\n  日付: {date}\n  場所: {place}\n  リンク: {link}")
-        notify_discord("\n".join(message_lines))
+        sorted_diff = [item for item in new_items_list if item in diff]  # 公式順
+        notify_discord(f"✅ 新着があります（収集日時：{current_time}）")
+        for item in sorted_diff:
+            notify_discord(f"    - {item}")
         save_state(new_items)
 
 if __name__ == "__main__":
