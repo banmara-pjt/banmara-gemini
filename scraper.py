@@ -2,7 +2,7 @@ import os
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options # Serviceは使わない
+from selenium.webdriver.chrome.options import Options
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 TARGET_URL = "https://bang-dream.com/events?event_tag=19"
@@ -14,7 +14,6 @@ def get_page_items():
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     
-    # ここでServiceもexecutable_pathも指定しない！
     driver = webdriver.Chrome(options=options)
 
     items = []
@@ -22,6 +21,10 @@ def get_page_items():
         driver.get(TARGET_URL)
         
         driver.implicitly_wait(10)
+        
+        print("--- ページHTML ---")
+        print(driver.page_source)
+        print("--- ---------- ---")
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
         
@@ -44,10 +47,38 @@ def get_page_items():
         return items
 
     except Exception as e:
-        print(f"An error occurred during scraping with Selenium: {e}")
+        print(f"An error occurred during scraping: {e}")
         return []
     finally:
         driver.quit()
 
-# load_last_state(), save_state(), notify_discord(), main() は変更なし
-# ... (省略)
+def load_last_state():
+    if not os.path.exists(STATE_FILE):
+        return set()
+    with open(STATE_FILE, "r", encoding="utf-8") as f:
+        return set(line.strip() for line in f)
+
+def save_state(items):
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join(items))
+
+def notify_discord(message):
+    try:
+        requests.post(WEBHOOK_URL, json={"content": message})
+    except Exception as e:
+        print(f"Error sending Discord notification: {e}")
+
+def main():
+    new_items = set(get_page_items())
+    old_items = load_last_state()
+
+    diff = new_items - old_items
+    if diff:
+        for item in diff:
+            notify_discord(f"📢 新着情報: {item}")
+        save_state(new_items)
+    else:
+        notify_discord("✅ 新着なし")
+
+if __name__ == "__main__":
+    main()
