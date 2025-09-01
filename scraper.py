@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import asyncio
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -9,11 +10,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 
 def get_live_info():
-    """Seleniumを使ってライブ情報を取得する関数"""
+    """SeleniumとBeautiful Soupを使ってウェブサイトからライブ情報を取得する関数"""
     options = Options()
     options.add_argument("--headless")
     
-    # この部分は、GitHub Actionsが自動で設定してくれるため、このままでOK
     driver = webdriver.Chrome(options=options)
     
     url = "https://bang-dream.com/events?event_tag=19"
@@ -69,11 +69,27 @@ def main():
         
         if new_events:
             print("🎉 新着ライブ情報が見つかりました！")
+            
+            # 通知メッセージを作成
+            message = "🎉 新着ライブ情報があります！\n"
             for event in new_events:
                 print(f"・{event['title']} - {event['date']} @ {event['place']}")
+                message += f"・**{event['title']}**\n    日時: {event['date']}\n    場所: {event['place']}\n"
             
-            # ここにDiscord通知のコードを追加します。
-            # 次のステップで、bot.pyを作成し、この部分から呼び出します。
+            # 環境変数からトークンとチャンネルIDを取得
+            DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+            DISCORD_CHANNEL_ID = os.getenv('DISCORD_CHANNEL_ID')
+            
+            if DISCORD_TOKEN and DISCORD_CHANNEL_ID:
+                try:
+                    from bot import send_notification
+                    asyncio.run(send_notification(DISCORD_TOKEN, int(DISCORD_CHANNEL_ID), message))
+                except ImportError:
+                    print("bot.pyが見つからないため、通知をスキップします。")
+                except ValueError:
+                    print("DiscordチャンネルIDが不正な値です。数値であることを確認してください。")
+            else:
+                print("Discordの環境変数が設定されていません。通知をスキップします。")
         else:
             print("新着情報はありませんでした。")
 
