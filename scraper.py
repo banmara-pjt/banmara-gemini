@@ -70,8 +70,16 @@ def main():
         save_state(new_items)
     else:
         notify_discord({"title": "新着なし", "date": "", "link": ""})
+def load_last_state():
+    if not os.path.exists(STATE_FILE):
+        return []
+    with open(STATE_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        print("Last State:", data)  # ここで内容を出力
+        return data
 
     save_events(new_items)
 
 if __name__ == "__main__":
     main()
+
