@@ -1,71 +1,57 @@
-import json
-import time
-from selenium import webdriver
+import os
+import requests
 from bs4 import BeautifulSoup
+import json
 
-# 保存ファイル
-OUTPUT_FILE = "events.json"
-# 公式サイト (Liveタグ付きのイベント一覧)
-URL = "https://bang-dream.com/events?event_tag=19"
+WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+TARGET_URL = "https://example.com"  # 監視対象のページ
 
-def scrape_events():
-    # Seleniumブラウザ起動
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")  # 画面を表示せずに実行
-    driver = webdriver.Chrome(options=options)
+STATE_FILE = "last_state.json"
 
-    print(f"アクセス中: {URL}")
-    driver.get(URL)
-    time.sleep(5)  # ページ読み込み待ち（調整可）
+def get_page_items():
+    response = requests.get(TARGET_URL)
+    soup = BeautifulSoup(response.text, "html.parser")
 
-    # ページHTML取得
-    html = driver.page_source
-    driver.quit()
+    items = []
+    for entry in soup.select(".entry")[:10]:
+        title = entry.select_one(".title").get_text(strip=True)
+        date = entry.select_one(".date").get_text(strip=True)
+        link = entry.select_one("a")["href"]
+        items.append({"title": title, "date": date, "link": link})
+    return items
 
-    # BeautifulSoupで解析
-    soup = BeautifulSoup(html, "html.parser")
+def load_last_state():
+    if not os.path.exists(STATE_FILE):
+        return []
+    with open(STATE_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-    events_data = []
-    # 各イベントを囲んでいる li
-    events = soup.select("ul.liveEventList > li")
+def save_state(items):
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False, indent=2)
 
-    print(f"DEBUG: {len(events)} 件のイベントを検出")
+def notify_discord(item):
+    message = f"📢 **新着情報**\n" \
+              f"📝 {item['title']}\n" \
+              f"📅 {item['date']}\n" \
+              f"🔗 {item['link']}"
+    requests.post(WEBHOOK_URL, json={"content": message})
 
-    for event in events:
-        # タイトル
-        title_tag = event.select_one("p.liveEventListTitle")
-        title = title_tag.get_text(strip=True) if title_tag else "No Title"
+def main():
+    new_items = get_page_items()
+    old_items = load_last_state()
 
-        # 日時と場所
-        date, place = "No Date", "No Place"
-        info_rows = event.select(".itemInfoRow")
-        for row in info_rows:
-            key = row.select_one(".itemInfoColumnTitle")
-            value = row.select_one(".itemInfoColumnData")
-            if not key or not value:
-                continue
-            key_text = key.get_text(strip=True)
-            if "開催日時" in key_text:
-                date = value.get_text(strip=True)
-            elif "場所" in key_text:
-                place = value.get_text(strip=True)
+    # 辞書リストの比較用に (title, date, link) のタプル化
+    old_set = {(i["title"], i["date"], i["link"]) for i in old_items}
+    new_set = {(i["title"], i["date"], i["link"]) for i in new_items}
 
-        # JSON用のdictにまとめる
-        events_data.append({
-            "title": title,
-            "date": date,
-            "place": place
-        })
-
-    # JSONに保存
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(events_data, f, ensure_ascii=False, indent=2)
-
-    if events_data:
-        print(f"{len(events_data)} 件のイベントを保存しました → {OUTPUT_FILE}")
+    diff = new_set - old_set
+    if diff:
+        for title, date, link in diff:
+            notify_discord({"title": title, "date": date, "link": link})
+        save_state(new_items)
     else:
-        print("イベント情報が見つかりませんでした")
+        notify_discord({"title": "新着なし", "date": "", "link": ""})
 
 if __name__ == "__main__":
-    scrape_events()
-print("Scraper finished successfully")
+    main()
