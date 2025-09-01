@@ -1,87 +1,81 @@
-import os
 import requests
 from bs4 import BeautifulSoup
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
+import os
 
-WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
-TARGET_URL = "https://example.com"  # 監視対象のページ
-
-STATE_FILE = "last_state.json"
-EVENTS_FILE = "events.json"
-
-
-def get_page_items():
-    response = requests.get(TARGET_URL)
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    items = []
-    for entry in soup.select(".entry")[:10]:
-        title = entry.select_one(".title").get_text(strip=True)
-        date = entry.select_one(".date").get_text(strip=True)
-        link = entry.select_one("a")["href"]
-        items.append({"title": title, "date": date, "link": link})
-    return items
+URL = "https://bang-dream.com/events"
+JSON_FILE = "events.json"
+WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
 
-def load_last_state():
-    if not os.path.exists(STATE_FILE):
-        return []
-    with open(STATE_FILE, "r", encoding="utf-8") as f:
+def load_events():
+    if not os.path.exists(JSON_FILE):
+        return {"timestamp": None, "events": []}
+    with open(JSON_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def save_state(items):
-    with open(STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+def save_events(events):
+    with open(JSON_FILE, "w", encoding="utf-8") as f:
+        json.dump(events, f, ensure_ascii=False, indent=2)
 
 
-def save_events(items):
-    # 日本時間のタイムスタンプを追加
-    now_jst = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M:%S")
-    data = {
-        "timestamp": now_jst,
-        "events": items
-    }
-    with open(EVENTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def scrape_events():
+    response = requests.get(URL)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # 公式サイトのイベントリストを取得
+    event_items = soup.select(".p-event__list-item")
+
+    events = []
+    for item in event_items:
+        title = item.select_one(".p-event__list-item__title").get_text(strip=True)
+        date = item.select_one(".p-event__list-item__date").get_text(strip=True)
+        link = item.select_one("a")["href"]
+
+        events.append({
+            "title": title,
+            "date": date,
+            "link": link
+        })
+
+    return events
 
 
-def notify_discord(item):
-    # 日本時間の現在時刻を追加
-    now_jst = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M:%S")
+def send_discord_notification(new_events):
+    if not WEBHOOK_URL:
+        print("⚠️ DISCORD_WEBHOOK_URL が設定されていません")
+        return
 
-    if item["title"] == "新着なし":
-        message = f"🔍 新着なし\n確認時刻: {now_jst}"
-    else:
-        message = (
-            f"📢 **新着情報**\n"
-            f"📝 {item['title']}\n"
-            f"📅 {item['date']}\n"
-            f"🔗 {item['link']}\n"
-            f"確認時刻: {now_jst}"
-        )
-    requests.post(WEBHOOK_URL, json={"content": message})
+    content = "**新しいイベント情報が追加されました！**\n\n"
+    for event in new_events:
+        content += f"📌 {event['date']} - [{event['title']}]({event['link']})\n"
+
+    payload = {"content": content}
+    requests.post(WEBHOOK_URL, json=payload)
 
 
 def main():
-    new_items = get_page_items()
-    old_items = load_last_state()
+    old_data = load_events()
+    old_events = old_data.get("events", [])
 
-    # 辞書リストの比較用に (title, date, link) のタプル化
-    old_set = {(i["title"], i["date"], i["link"]) for i in old_items}
-    new_set = {(i["title"], i["date"], i["link"]) for i in new_items}
+    new_events = scrape_events()
 
-    diff = new_set - old_set
+    # 差分チェック
+    diff = [e for e in new_events if e not in old_events]
+
     if diff:
-        for title, date, link in diff:
-            notify_discord({"title": title, "date": date, "link": link})
-        save_state(new_items)
+        print(f"新しいイベント {len(diff)} 件を検出しました")
+        send_discord_notification(diff)
     else:
-        notify_discord({"title": "新着なし", "date": "", "link": ""})
+        print("新着なし")
 
-    # 常に events.json を更新
-    save_events(new_items)
+    # データ更新
+    save_events({
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "events": new_events
+    })
 
 
 if __name__ == "__main__":
