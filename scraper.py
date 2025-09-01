@@ -14,34 +14,34 @@ def get_page_items():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    
-    driver = webdriver.Chrome(options=options)
 
+    driver = webdriver.Chrome(options=options)
     items = []
     try:
         driver.get(TARGET_URL)
         driver.implicitly_wait(10)
         soup = BeautifulSoup(driver.page_source, "html.parser")
-        
+
         for entry in soup.select("a[href^='/events/']")[:10]:
             title_element = entry.select_one(".liveEventListTitle")
             date_element = entry.select_one(".itemInfoColumnData")
-            place_element = entry.select_one(".itemInfoColumnData:nth-of-type(2)")
+            
+            place_elements = entry.select(".itemInfoColumnData")
+            if len(place_elements) > 1:
+                place_text = place_elements[1].get_text(strip=True)
+            else:
+                place_text = "場所不明"
 
             if title_element and date_element:
                 title = title_element.get_text(strip=True)
                 date = date_element.get_text(strip=True)
-                place = place_element.get_text(strip=True) if place_element else ""
-                
-                # 差異判定用のキーはタイトル + 日付
-                key = f"{title}|{date}"
-                
-                # 通知用の整形アイテム
+                link = entry["href"]
+
+                # 差分判定用に、前回と同じ形式の文字列（title|date|link）を'norm'に格納
+                # 通知用に、場所を含んだ文字列を'raw'に格納
                 items.append({
-                    "key": key,
-                    "title": title,
-                    "date": date,
-                    "place": place
+                    "norm": f"{title}|{date}|{link}",
+                    "raw": f"{title} | {date} | {place_text}"
                 })
         return items
 
@@ -59,8 +59,7 @@ def load_last_state():
 
 def save_state(items):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
-        keys = [item["key"] for item in items]
-        f.write("\n".join(keys))
+        f.write("\n".join([item["norm"] for item in items]))
 
 def notify_discord(message):
     try:
@@ -70,27 +69,27 @@ def notify_discord(message):
 
 def main():
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_items = get_page_items()
-    old_keys = load_last_state()
+    new_items_list = get_page_items()
+    old_items = load_last_state()
 
-    if new_items is None:
-        notify_discord(f"⚠️ **スクレイピング失敗（収集日時：{current_time}）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
+    if new_items_list is None:
+        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
         return
 
-    new_keys = set(item["key"] for item in new_items)
-    diff_keys = new_keys - old_keys
+    new_set = set(item["norm"] for item in new_items_list)
+    diff_norms = new_set - old_items
+    diff_items = [item for item in new_items_list if item["norm"] in diff_norms]
 
-    if not diff_keys and new_items:
-        notify_discord(f"ℹ️ **新着はありません（動作は正常です）（収集日時：{current_time}）**")
-    elif not new_items:
-        notify_discord(f"⚠️ **データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）**")
+    if not diff_items and new_items_list:
+        notify_discord(f"✅ **正常に動作しています（新着情報はありません）（収集日時：{current_time}）**")
+    elif not new_items_list:
+        notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）**")
     else:
-        notify_discord(f"✅ **新着があります（収集日時：{current_time}）**")
-        for item in new_items:
-            if item["key"] in diff_keys:
-                msg = f"📝 {item['title']}\n📅 {item['date']}\n📍 {item['place']}"
-                notify_discord(msg)
-        save_state(new_items)
+        notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）**")
+        for item in diff_items:
+            notify_discord(f"    - {item['raw']}")
+
+    save_state(new_items_list)
 
 if __name__ == "__main__":
     main()
