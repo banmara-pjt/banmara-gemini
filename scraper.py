@@ -16,31 +16,27 @@ def get_page_items():
     options.add_argument('--disable-dev-shm-usage')
     
     driver = webdriver.Chrome(options=options)
-
     items = []
     try:
         driver.get(TARGET_URL)
-        
         driver.implicitly_wait(10)
-
         soup = BeautifulSoup(driver.page_source, "html.parser")
         
-        # セレクタを新しいHTML構造に合わせる
         for entry in soup.select("a[href^='/events/']")[:10]:
             title_element = entry.select_one(".liveEventListTitle")
             date_element = entry.select_one(".itemInfoColumnData")
+            place_element = entry.select(".itemInfoColumnData")[1] if len(entry.select(".itemInfoColumnData")) > 1 else None
             
-            if title_element and date_element:
+            if title_element and date_element and place_element:
                 title = title_element.get_text(strip=True)
                 date = date_element.get_text(strip=True)
+                place = place_element.get_text(strip=True)
                 link = entry["href"]
-                items.append(f"{title}|{date}|{link}")
-            
+                items.append(f"{title}|{date}|{place}|{link}")
         return items
 
     except Exception as e:
         print(f"An error occurred during scraping: {e}")
-        # スクレイピング失敗時はNoneを返す
         return None
     finally:
         driver.quit()
@@ -66,30 +62,23 @@ def main():
     new_items_list = get_page_items()
     old_items = load_last_state()
 
-    # 1. スクレイピングが失敗した場合
     if new_items_list is None:
-        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
+        notify_discord(f"⚠️ **サイトの形式が変更された可能性があります（収集日時：{current_time}）**\n情報が取得できませんでした。コードの修正が必要かもしれません。")
         return
 
-    # スクレイピング成功後、セットに変換
     new_items = set(new_items_list)
     diff = new_items - old_items
 
-    # 2. 正常に作動して前回と変更がなかった場合
-    if not diff:
-        notify_discord(f"✅ **正常に動作しています（新着情報はありません）（収集日時：{current_time}）**")
-    # 3. サイトの形式が変わり、データをとれなかった場合
+    if not diff and new_items:
+        notify_discord(f"ℹ️ 新着はありません（動作は正常です）（収集日時：{current_time}）")
     elif not new_items:
-        notify_discord(f"⚠️ **警告：サイトの形式が変更された可能性があります（収集日時：{current_time}）**\n情報が取得できませんでした。コードの修正が必要かもしれません。")
-        
-    # 4. 新着情報があった場合
+        notify_discord(f"⚠️ データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）")
     else:
-        sorted_diff = sorted(list(diff))
-        
-        notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）**")
-        for item in sorted_diff:
-            notify_discord(f"    - {item}")
-        
+        message_lines = [f"✅ 新着があります（収集日時：{current_time}）"]
+        for item in sorted(diff):
+            title, date, place, link = item.split("|")
+            message_lines.append(f"・{title}\n  日付: {date}\n  場所: {place}\n  リンク: {link}")
+        notify_discord("\n".join(message_lines))
         save_state(new_items)
 
 if __name__ == "__main__":
