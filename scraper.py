@@ -24,24 +24,18 @@ def get_page_items():
 
         for entry in soup.select("a[href^='/events/']")[:10]:
             title_element = entry.select_one(".liveEventListTitle")
-            date_element = entry.select_one(".itemInfoColumnData")
             
-            place_elements = entry.select(".itemInfoColumnData")
-            if len(place_elements) > 1:
-                place_text = place_elements[1].get_text(strip=True)
-            else:
-                place_text = "場所不明"
-
-            if title_element and date_element:
+            date_and_place = entry.select(".itemInfoColumnData")
+            
+            if title_element and len(date_and_place) >= 2:
                 title = title_element.get_text(strip=True)
-                date = date_element.get_text(strip=True)
+                date = date_and_place[0].get_text(strip=True)
+                place = date_and_place[1].get_text(strip=True)
                 link = entry["href"]
 
-                # 差分判定用に、前回と同じ形式の文字列（title|date|link）を'norm'に格納
-                # 通知用に、場所を含んだ文字列を'raw'に格納
                 items.append({
                     "norm": f"{title}|{date}|{link}",
-                    "raw": f"{title} | {date} | {place_text}"
+                    "raw": f"{title} | {date} | {place}"
                 })
         return items
 
@@ -76,8 +70,8 @@ def main():
         notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
         return
 
-    new_set = set(item["norm"] for item in new_items_list)
-    diff_norms = new_set - old_items
+    new_items = set(item["norm"] for item in new_items_list)
+    diff_norms = new_items - old_items
     diff_items = [item for item in new_items_list if item["norm"] in diff_norms]
 
     if not diff_items and new_items_list:
