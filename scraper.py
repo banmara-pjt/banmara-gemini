@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
-TARGET_URL = "https://example.com"
+TARGET_URL = "https://bang-dream.com/events?event_tag=19"
 STATE_FILE = "last_state.txt"
 
 def get_page_items():
@@ -63,3 +63,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
