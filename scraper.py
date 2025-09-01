@@ -28,15 +28,15 @@ def get_page_items():
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
         
-        for entry in soup.select(".c-event__list_item")[:10]:
-            title_element = entry.select_one(".c-event__list_title")
-            date_element = entry.select_one(".c-event__list_date")
-            link_element = entry.select_one("a")
-
-            if title_element and date_element and link_element:
+        # セレクタを新しいHTML構造に合わせる
+        for entry in soup.select("a[href^='/events/']")[:10]:
+            title_element = entry.select_one(".liveEventListTitle")
+            date_element = entry.select_one(".itemInfoColumnData")
+            
+            if title_element and date_element:
                 title = title_element.get_text(strip=True)
                 date = date_element.get_text(strip=True)
-                link = link_element["href"]
+                link = entry["href"]
                 items.append(f"{title}|{date}|{link}")
             
         print("--- スクレイピング結果 ---")
