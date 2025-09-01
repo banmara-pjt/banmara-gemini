@@ -2,6 +2,7 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import json
+from datetime import datetime, timezone, timedelta
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 TARGET_URL = "https://example.com"  # 監視対象のページ
@@ -31,10 +32,19 @@ def save_state(items):
         json.dump(items, f, ensure_ascii=False, indent=2)
 
 def notify_discord(item):
-    message = f"📢 **新着情報**\n" \
-              f"📝 {item['title']}\n" \
-              f"📅 {item['date']}\n" \
-              f"🔗 {item['link']}"
+    # 日本時間の現在時刻を追加
+    now_jst = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M:%S")
+
+    if item["title"] == "新着なし":
+        message = f"🔍 新着なし\n確認時刻: {now_jst}"
+    else:
+        message = (
+            f"📢 **新着情報**\n"
+            f"📝 {item['title']}\n"
+            f"📅 {item['date']}\n"
+            f"🔗 {item['link']}\n"
+            f"確認時刻: {now_jst}"
+        )
     requests.post(WEBHOOK_URL, json={"content": message})
 
 def main():
