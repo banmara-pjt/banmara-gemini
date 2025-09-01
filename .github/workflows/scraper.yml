@@ -2,11 +2,11 @@ name: Daily Scraper
 
 on:
   schedule:
-    - cron: "0 3 * * *"  # UTCの3時 → 日本時間で12時
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
-  scrape:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,18 +16,21 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Cache state file
+        id: cache-state
+        uses: actions/cache@v3
+        with:
+          path: last_state.txt
+          key: ${{ runner.os }}-state-file-${{ hashFiles('last_state.txt') }}
 
       - name: Run scraper
         run: python scraper.py
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-
-      - name: Send result to Discord
-        run: |
-          curl -H "Content-Type: application/json" \
-               -d '{"content":"✅ Scraper finished! events.json updated."}' \
-               ${{ secrets.DISCORD_WEBHOOK_URL }}
