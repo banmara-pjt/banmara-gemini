@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from datetime import datetime
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 TARGET_URL = "https://bang-dream.com/events?event_tag=19"
@@ -28,7 +29,6 @@ def get_page_items():
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
         
-        # セレクタを新しいHTML構造に合わせる
         for entry in soup.select("a[href^='/events/']")[:10]:
             title_element = entry.select_one(".liveEventListTitle")
             date_element = entry.select_one(".itemInfoColumnData")
@@ -72,13 +72,21 @@ def main():
     new_items = set(get_page_items())
     old_items = load_last_state()
 
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     diff = new_items - old_items
     if diff:
-        for item in diff:
-            notify_discord(f"📢 新着情報: {item}")
+        sorted_diff = sorted(list(diff))
+        
+        # 収集日時を含めた通知メッセージ
+        notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）**")
+        for item in sorted_diff:
+            notify_discord(f"    - {item}")
+        
         save_state(new_items)
     else:
-        notify_discord("✅ 新着なし")
+        # 収集日時を含めた通知メッセージ
+        notify_discord(f"✅ **新着情報はありません（収集日時：{current_time}）**")
 
 if __name__ == "__main__":
     main()
