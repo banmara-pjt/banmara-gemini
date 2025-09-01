@@ -18,7 +18,14 @@ def get_page_items():
             date = entry.select_one(".date").get_text(strip=True)
             link = entry.select_one("a")["href"]
             items.append(f"{title}|{date}|{link}")
+        
+        print("--- スクレイピング結果 ---")
+        for item in items:
+            print(item)
+        print("--- ---------------- ---")
+        
         return items
+
     except requests.RequestException as e:
         print(f"Error fetching page: {e}")
         return []
