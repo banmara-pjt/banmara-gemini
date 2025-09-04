@@ -66,6 +66,25 @@ def main():
     new_items_list = get_page_items()
     old_items = load_last_state()
 
+    # --- ログ出力開始 ---
+    print("--- 収集ログ（収集日時: {}） ---".format(current_time))
+    
+    print("\n--- 今回取得したデータ ---")
+    if new_items_list:
+        for item in new_items_list:
+            print(f"  - {item['raw']}")
+    else:
+        print("  データなし")
+        
+    print("\n--- 前回保存されていたデータ ---")
+    if old_items:
+        for item in old_items:
+            print(f"  - {item}")
+    else:
+        print("  データなし")
+
+    # --- ログ出力終了 ---
+
     if new_items_list is None:
         notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
         return
