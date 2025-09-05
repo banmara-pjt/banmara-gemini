@@ -22,8 +22,8 @@ def get_page_items():
 
             soup = BeautifulSoup(page.content(), "html.parser")
             
-            # 汎用的なセレクタでリンクを取得
-            for entry in soup.select("a[href^='/']"):
+            # .liveEventListInfo クラスを持つ要素をすべて取得
+            for entry in soup.select(".liveEventListInfo"):
                 title_element = entry.select_one(".liveEventListTitle")
                 
                 date_and_place = entry.select(".itemInfoColumnData")
@@ -32,7 +32,8 @@ def get_page_items():
                     title = title_element.get_text(strip=True)
                     date = date_and_place[0].get_text(strip=True)
                     place = date_and_place[1].get_text(strip=True)
-                    link = entry["href"]
+                    # リンクは a タグから取得
+                    link = entry.select_one("a")["href"]
 
                     items.append({
                         "norm": f"{title}|{date}|{link}",
