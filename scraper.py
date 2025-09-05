@@ -32,8 +32,9 @@ def get_page_items():
                     title = title_element.get_text(strip=True)
                     date = date_and_place[0].get_text(strip=True)
                     place = date_and_place[1].get_text(strip=True)
-                    # リンクは a タグから取得
-                    link = entry.select_one("a")["href"]
+                    
+                    # リンクを親の a タグから取得
+                    link = entry.find_parent("a")["href"]
 
                     items.append({
                         "norm": f"{title}|{date}|{link}",
