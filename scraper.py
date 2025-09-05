@@ -4,7 +4,9 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
-import time # 追加
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 TARGET_URL = "https://bang-dream.com/events?event_tag=19"
@@ -20,14 +22,15 @@ def get_page_items():
     items = []
     try:
         driver.get(TARGET_URL)
-        driver.implicitly_wait(10)
         
-        # 動的なコンテンツの読み込みを待機
-        time.sleep(3)
+        # ライブイベントリストが表示されるまで待機
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "liveEventListInfo"))
+        )
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
         
-        # 件数制限を撤廃してすべてのライブ情報を取得
+        # 汎用的なセレクタでリンクを取得
         for entry in soup.select("a[href^='/']"):
             title_element = entry.select_one(".liveEventListTitle")
             
@@ -113,4 +116,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
