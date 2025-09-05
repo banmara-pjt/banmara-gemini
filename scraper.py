@@ -28,7 +28,7 @@ def get_page_items():
         soup = BeautifulSoup(driver.page_source, "html.parser")
         
         # 件数制限を撤廃してすべてのライブ情報を取得
-        for entry in soup.select("a[href^='/events/']"):
+        for entry in soup.select("a[href^='/']"):
             title_element = entry.select_one(".liveEventListTitle")
             
             date_and_place = entry.select(".itemInfoColumnData")
@@ -113,3 +113,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
