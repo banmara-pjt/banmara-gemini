@@ -1,5 +1,5 @@
 flask
 discord.py
-selenium
+playwright
 beautifulsoup4
 requests
