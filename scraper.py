@@ -1,58 +1,49 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from playwright.sync_api import sync_playwright
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 TARGET_URL = "https://bang-dream.com/events?event_tag=19"
 STATE_FILE = "last_state.txt"
 
 def get_page_items():
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-
-    driver = webdriver.Chrome(options=options)
     items = []
     try:
-        driver.get(TARGET_URL)
-        
-        # ライブイベントリストが表示されるまで待機
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "liveEventListInfo"))
-        )
-
-        soup = BeautifulSoup(driver.page_source, "html.parser")
-        
-        # 汎用的なセレクタでリンクを取得
-        for entry in soup.select("a[href^='/']"):
-            title_element = entry.select_one(".liveEventListTitle")
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
             
-            date_and_place = entry.select(".itemInfoColumnData")
+            page.goto(TARGET_URL)
             
-            if title_element and len(date_and_place) >= 2:
-                title = title_element.get_text(strip=True)
-                date = date_and_place[0].get_text(strip=True)
-                place = date_and_place[1].get_text(strip=True)
-                link = entry["href"]
+            # ライブ情報が読み込まれるまで待機
+            page.wait_for_selector(".liveEventListInfo", timeout=10000)
 
-                items.append({
-                    "norm": f"{title}|{date}|{link}",
-                    "raw": f"{title} | {date} | {place}"
-                })
+            soup = BeautifulSoup(page.content(), "html.parser")
+            
+            # 汎用的なセレクタでリンクを取得
+            for entry in soup.select("a[href^='/']"):
+                title_element = entry.select_one(".liveEventListTitle")
+                
+                date_and_place = entry.select(".itemInfoColumnData")
+                
+                if title_element and len(date_and_place) >= 2:
+                    title = title_element.get_text(strip=True)
+                    date = date_and_place[0].get_text(strip=True)
+                    place = date_and_place[1].get_text(strip=True)
+                    link = entry["href"]
+
+                    items.append({
+                        "norm": f"{title}|{date}|{link}",
+                        "raw": f"{title} | {date} | {place}"
+                    })
+            browser.close()
         return items
 
     except Exception as e:
         print(f"An error occurred during scraping: {e}")
         return None
-    finally:
-        driver.quit()
 
 def load_last_state():
     if not os.path.exists(STATE_FILE):
@@ -75,7 +66,7 @@ def main():
     new_items_list = get_page_items()
     old_items = load_last_state()
 
-    # --- 収集ログ（収集日時: 2025-09-05 03:46:32） ---
+    # --- 収集ログ ---
     print("--- 収集ログ（収集日時: {}） ---".format(current_time))
     
     print("\n--- 今回取得したデータ ---")
