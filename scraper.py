@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
+import time # 追加
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 TARGET_URL = "https://bang-dream.com/events?event_tag=19"
@@ -20,9 +21,14 @@ def get_page_items():
     try:
         driver.get(TARGET_URL)
         driver.implicitly_wait(10)
-        soup = BeautifulSoup(driver.page_source, "html.parser")
+        
+        # 動的なコンテンツの読み込みを待機
+        time.sleep(3)
 
-        for entry in soup.select("a[href^='/events/']")[:10]:
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        
+        # 件数制限を撤廃してすべてのライブ情報を取得
+        for entry in soup.select("a[href^='/events/']"):
             title_element = entry.select_one(".liveEventListTitle")
             
             date_and_place = entry.select(".itemInfoColumnData")
@@ -66,7 +72,7 @@ def main():
     new_items_list = get_page_items()
     old_items = load_last_state()
 
-    # --- ログ出力開始 ---
+    # --- 収集ログ（収集日時: 2025-09-05 03:46:32） ---
     print("--- 収集ログ（収集日時: {}） ---".format(current_time))
     
     print("\n--- 今回取得したデータ ---")
