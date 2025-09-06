@@ -88,7 +88,7 @@ def main():
     # --- ログ出力終了 ---
 
     if new_items_list is None:
-        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
+        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）（Gemini）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
         return
 
     new_set = set(item["norm"] for item in new_items_list)
@@ -96,12 +96,12 @@ def main():
     diff_items = [item for item in new_items_list if item["norm"] in diff_norms]
 
     if not diff_items and new_items_list:
-        notify_discord(f"✅ **正常に動作しています（新着情報はありません）（収集日時：{current_time}）**")
+        notify_discord(f"✅ **正常に動作しています（新着情報はありません）（収集日時：{current_time}）（Gemini）**")
     elif not new_items_list:
-        notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）**")
+        notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）（Gemini）**")
     else:
         sorted_diff = sorted(list(diff_items), key=lambda x: x['raw'])
-        notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）**")
+        notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）（Gemini）**")
         for item in sorted_diff:
             notify_discord(f"    - {item['raw']}")
 
