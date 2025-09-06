@@ -31,7 +31,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: last_state.txt
-          key: ${{ runner.os }}-state-file-${{ hashFiles('last_state.txt') }}
+          key: ${{ runner.os }}-last-events-v1
 
       - name: Run scraper
         run: python scraper.py
