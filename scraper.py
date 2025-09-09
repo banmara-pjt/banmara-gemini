@@ -51,10 +51,13 @@ def load_last_state():
     if not os.path.exists(STATE_FILE):
         return set()
     with open(STATE_FILE, "r", encoding="utf-8") as f:
-        return set(line.strip() for line in f)
+        lines = [line.strip() for line in f if not line.strip().startswith("#")]
+        return set(lines)
 
 def save_state(items):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"# Saved Date: {current_time}\n")
         f.write("\n".join([item["norm"] for item in items]))
 
 def notify_discord(message):
@@ -80,6 +83,11 @@ def main():
         
     print("\n--- 前回保存されていたデータ ---")
     if old_items:
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            first_line = f.readline().strip()
+            if first_line.startswith("# Saved Date:"):
+                saved_date = first_line.replace("# Saved Date: ", "")
+                print(f"  （取得日時: {saved_date}）")
         for item in old_items:
             print(f"  - {item}")
     else:
