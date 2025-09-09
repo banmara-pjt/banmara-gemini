@@ -34,12 +34,15 @@ def get_page_items():
                     place = date_and_place[1].get_text(strip=True)
                     
                     # リンクを親の a タグから取得
-                    link = entry.find_parent("a")["href"]
+                    link_element = entry.find_parent("a")
+                    link = link_element.get("href") if link_element else None
 
-                    items.append({
-                        "norm": f"{title}|{date}|{link}",
-                        "raw": f"{title} | {date} | {place}"
-                    })
+                    if link:
+                        items.append({
+                            "norm": f"{title}|{date}|{link}",
+                            "raw": f"{title} | {date} | {place}"
+                        })
+
             browser.close()
         return items
 
@@ -50,10 +53,11 @@ def get_page_items():
 def load_last_state():
     if not os.path.exists(STATE_FILE):
         return set()
+    
     with open(STATE_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
+        
         if lines and lines[0].startswith("# Saved Date:"):
-            # タイムスタンプ行をスキップ
             return set(line.strip() for line in lines[1:])
         else:
             return set(line.strip() for line in lines)
@@ -121,4 +125,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
