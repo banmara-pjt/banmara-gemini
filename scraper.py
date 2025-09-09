@@ -22,6 +22,12 @@ def get_page_items():
 
             soup = BeautifulSoup(page.content(), "html.parser")
             
+            # --- デバッグ用 ---
+            # 取得したHTMLのソースをそのまま出力する
+            print("--- HTML Source (Debug) ---")
+            print(soup.prettify())
+            # --- デバッグ終了 ---
+            
             # .liveEventListInfo クラスを持つ要素をすべて取得
             for entry in soup.select(".liveEventListInfo"):
                 title_element = entry.select_one(".liveEventListTitle")
@@ -33,16 +39,13 @@ def get_page_items():
                     date = date_and_place[0].get_text(strip=True)
                     place = date_and_place[1].get_text(strip=True)
                     
-                    # リンクを親の a タグから取得
                     link_element = entry.find_parent("a")
-                    link = link_element.get("href") if link_element and "href" in link_element.attrs else ""
+                    link = link_element["href"]
 
-                    if link:
-                        items.append({
-                            "norm": f"{title}|{date}|{link}",
-                            "raw": f"{title} | {date} | {place}"
-                        })
-
+                    items.append({
+                        "norm": f"{title}|{date}|{link}",
+                        "raw": f"{title} | {date} | {place}"
+                    })
             browser.close()
         return items
 
