@@ -17,12 +17,10 @@ def get_page_items():
             
             page.goto(TARGET_URL)
             
-            # ライブ情報が読み込まれるまで待機
             page.wait_for_selector(".liveEventListInfo", timeout=10000)
 
             soup = BeautifulSoup(page.content(), "html.parser")
             
-            # .liveEventListInfo クラスを持つ要素をすべて取得
             for entry in soup.select(".liveEventListInfo"):
                 title_element = entry.select_one(".liveEventListTitle")
                 
@@ -33,12 +31,10 @@ def get_page_items():
                     date = ""
                     place = ""
                     
-                    # ライブ情報に日時と場所がある場合
                     if len(date_and_place) >= 2:
                         date = date_and_place[0].get_text(strip=True)
                         place = date_and_place[1].get_text(strip=True)
                     
-                    # リンクを親の a タグから取得
                     link_element = entry.find_parent("a")
                     link = link_element["href"]
                     
@@ -59,16 +55,10 @@ def load_last_state():
     
     with open(STATE_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
-        
-        if lines and lines[0].startswith("# Saved Date:"):
-            return set(line.strip() for line in lines[1:])
-        else:
-            return set(line.strip() for line in lines)
+        return set(line.strip() for line in lines)
 
 def save_state(items):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"# Saved Date: {current_time}\n")
         f.write("\n".join([item["norm"] for item in items]))
 
 def notify_discord(message):
@@ -82,7 +72,6 @@ def main():
     new_items_list = get_page_items()
     old_items = load_last_state()
 
-    # --- 収集ログ ---
     print("--- 収集ログ（収集日時: {}） ---".format(current_time))
     
     print("\n--- 今回取得したデータ ---")
@@ -94,17 +83,10 @@ def main():
         
     print("\n--- 前回保存されていたデータ ---")
     if old_items:
-        with open(STATE_FILE, "r", encoding="utf-8") as f:
-            first_line = f.readline().strip()
-            if first_line.startswith("# Saved Date:"):
-                saved_date = first_line.replace("# Saved Date: ", "")
-                print(f"  （取得日時: {saved_date}）")
         for item in old_items:
             print(f"  - {item}")
     else:
         print("  データなし")
-
-    # --- ログ出力終了 ---
 
     if new_items_list is None:
         notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）（Gemini）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
