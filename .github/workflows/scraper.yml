@@ -1,12 +1,15 @@
-name: Daily Scraper
+name: scrape
 
 on:
+  push:
+    branches:
+      - main
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 */12 * * *'
   workflow_dispatch:
 
 jobs:
-  build:
+  scrape-and-notify:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,24 +19,22 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.x'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install Playwright
-        run: playwright install --with-deps chromium
-
-      - name: Cache state file
-        id: cache-state
+      - name: Cache last_state.txt
         uses: actions/cache@v3
         with:
           path: last_state.txt
           key: ${{ runner.os }}-last-events-v1
+          restore-keys: |
+            ${{ runner.os }}-last-events-
 
-      - name: Run scraper
+      - name: Run python scraper.py
         run: python scraper.py
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
