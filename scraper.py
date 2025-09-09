@@ -51,8 +51,12 @@ def load_last_state():
     if not os.path.exists(STATE_FILE):
         return set()
     with open(STATE_FILE, "r", encoding="utf-8") as f:
-        lines = [line.strip() for line in f if not line.strip().startswith("#")]
-        return set(lines)
+        lines = f.readlines()
+        if lines and lines[0].startswith("# Saved Date:"):
+            # タイムスタンプ行をスキップ
+            return set(line.strip() for line in lines[1:])
+        else:
+            return set(line.strip() for line in lines)
 
 def save_state(items):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
@@ -117,3 +121,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
