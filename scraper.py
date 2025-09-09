@@ -34,8 +34,7 @@ def get_page_items():
                     place = date_and_place[1].get_text(strip=True)
                     
                     # リンクを親の a タグから取得
-                    link_element = entry.find_parent("a")
-                    link = link_element["href"]
+                    link = entry.find_parent("a")["href"]
 
                     items.append({
                         "norm": f"{title}|{date}|{link}",
@@ -51,19 +50,11 @@ def get_page_items():
 def load_last_state():
     if not os.path.exists(STATE_FILE):
         return set()
-    
     with open(STATE_FILE, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-        
-        if lines and lines[0].startswith("# Saved Date:"):
-            return set(line.strip() for line in lines[1:])
-        else:
-            return set(line.strip() for line in lines)
+        return set(line.strip() for line in f)
 
 def save_state(items):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"# Saved Date: {current_time}\n")
         f.write("\n".join([item["norm"] for item in items]))
 
 def notify_discord(message):
@@ -89,11 +80,6 @@ def main():
         
     print("\n--- 前回保存されていたデータ ---")
     if old_items:
-        with open(STATE_FILE, "r", encoding="utf-8") as f:
-            first_line = f.readline().strip()
-            if first_line.startswith("# Saved Date:"):
-                saved_date = first_line.replace("# Saved Date: ", "")
-                print(f"  （取得日時: {saved_date}）")
         for item in old_items:
             print(f"  - {item}")
     else:
@@ -102,7 +88,7 @@ def main():
     # --- ログ出力終了 ---
 
     if new_items_list is None:
-        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）（Gemini）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
+        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
         return
 
     new_set = set(item["norm"] for item in new_items_list)
@@ -110,12 +96,12 @@ def main():
     diff_items = [item for item in new_items_list if item["norm"] in diff_norms]
 
     if not diff_items and new_items_list:
-        notify_discord(f"✅ **正常に動作しています（新着情報はありません）（収集日時：{current_time}）（Gemini）**")
+        notify_discord(f"✅ **正常に動作しています（新着情報はありません）（収集日時：{current_time}）**")
     elif not new_items_list:
-        notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）（Gemini）**")
+        notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）**")
     else:
         sorted_diff = sorted(list(diff_items), key=lambda x: x['raw'])
-        notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）（Gemini）**")
+        notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）**")
         for item in sorted_diff:
             notify_discord(f"    - {item['raw']}")
 
