@@ -35,14 +35,12 @@ def get_page_items():
                     
                     # リンクを親の a タグから取得
                     link_element = entry.find_parent("a")
-                    link = link_element.get("href") if link_element else None
+                    link = link_element["href"]
 
-                    if link:
-                        items.append({
-                            "norm": f"{title}|{date}|{link}",
-                            "raw": f"{title} | {date} | {place}"
-                        })
-
+                    items.append({
+                        "norm": f"{title}|{date}|{link}",
+                        "raw": f"{title} | {date} | {place}"
+                    })
             browser.close()
         return items
 
