@@ -25,6 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+          playwright install --with-deps chromium
 
       - name: Cache last_state.txt
         uses: actions/cache@v3
