@@ -2,7 +2,7 @@ import os
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 TARGET_URL = "https://bang-dream.com/events?event_tag=19"
@@ -63,7 +63,13 @@ def save_state(items):
 
 def notify_discord(message):
     try:
-        requests.post(WEBHOOK_URL, json={"content": message})
+        # UTCをJSTに変換
+        jst = timezone(timedelta(hours=9))
+        jst_time = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
+        
+        # JSTのタイムスタンプを追加
+        notification_message = f"{message} (タイムスタンプ: {jst_time})"
+        requests.post(WEBHOOK_URL, json={"content": notification_message})
     except Exception as e:
         print(f"Error sending Discord notification: {e}")
 
