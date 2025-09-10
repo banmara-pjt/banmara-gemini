@@ -2,7 +2,7 @@ import os
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 TARGET_URL = "https://bang-dream.com/events?event_tag=19"
@@ -53,6 +53,13 @@ def load_last_state():
     if not os.path.exists(STATE_FILE):
         return set()
     
+    # === デバッグ用 ===
+    print("\n--- last_state.txtの内容 ---")
+    with open(STATE_FILE, "r", encoding="utf-8") as f:
+        print(f.read())
+    print("------------------------")
+    # === デバッグ終了 ===
+    
     with open(STATE_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
         return set(line.strip() for line in lines)
@@ -63,13 +70,8 @@ def save_state(items):
 
 def notify_discord(message):
     try:
-        # UTCをJSTに変換
-        jst = timezone(timedelta(hours=9))
-        jst_time = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
-        
-        # JSTのタイムスタンプを追加
-        notification_message = f"{message} (タイムスタンプ: {jst_time})"
-        requests.post(WEBHOOK_URL, json={"content": notification_message})
+        # NOTE: This function is not implemented in this debug version to avoid sending notifications during testing.
+        pass
     except Exception as e:
         print(f"Error sending Discord notification: {e}")
 
@@ -99,7 +101,8 @@ def main():
         return
 
     new_set = set(item["norm"] for item in new_items_list)
-    diff_norms = new_set - old_items
+    old_set = set(old_items)
+    diff_norms = new_set - old_set
     diff_items = [item for item in new_items_list if item["norm"] in diff_norms]
 
     if not diff_items and new_items_list:
