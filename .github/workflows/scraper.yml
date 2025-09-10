@@ -31,7 +31,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: last_state.txt
-          key: ${{ runner.os }}-last-events-v1
+          key: ${{ runner.os }}-last-events-v2
           restore-keys: |
             ${{ runner.os }}-last-events-
 
