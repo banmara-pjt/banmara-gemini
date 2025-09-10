@@ -27,7 +27,7 @@ jobs:
           pip install -r requirements.txt
           playwright install --with-deps chromium
 
-      - name: Cache last_state.txt
+      - name: Restore cache
         uses: actions/cache@v3
         with:
           path: last_state.txt
@@ -39,3 +39,9 @@ jobs:
         run: python scraper.py
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Save cache
+        uses: actions/cache/save@v3
+        with:
+          path: last_state.txt
+          key: ${{ runner.os }}-last-events-v1
