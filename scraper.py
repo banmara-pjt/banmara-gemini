@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 from datetime import datetime, timezone, timedelta
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
-TARGET_URL = "https://bang-dream.com/events"
+TARGET_URL = "https://bang-dream.com/events?event_tag=19"
 STATE_FILE = "last_state.txt"
 
 def get_page_items():
@@ -17,25 +17,31 @@ def get_page_items():
             
             page.goto(TARGET_URL)
             
-            page.wait_for_selector(".c-section-event-list", timeout=10000)
+            page.wait_for_selector(".liveEventListInfo", timeout=10000)
 
             soup = BeautifulSoup(page.content(), "html.parser")
             
-            for entry in soup.select(".c-section-event-list__item"):
-                title_element = entry.select_one(".c-section-event-list__item__ttl")
-                date_element = entry.select_one(".c-section-event-list__item__date")
-                place_element = entry.select_one(".c-section-event-list__item__place")
-                link_element = entry.select_one(".c-section-event-list__item__link")
+            for entry in soup.select(".liveEventListInfo"):
+                title_element = entry.select_one(".liveEventListTitle")
                 
-                title = title_element.get_text(strip=True) if title_element else ""
-                date = date_element.get_text(strip=True) if date_element else ""
-                place = place_element.get_text(strip=True) if place_element else ""
-                link = link_element["href"] if link_element and "href" in link_element.attrs else ""
+                date_and_place = entry.select(".itemInfoColumnData")
                 
-                items.append({
-                    "norm": f"{title}|{date}|{link}",
-                    "raw": f"{title} | {date} | {place}"
-                })
+                if title_element:
+                    title = title_element.get_text(strip=True)
+                    date = ""
+                    place = ""
+                    
+                    if len(date_and_place) >= 2:
+                        date = date_and_place[0].get_text(strip=True)
+                        place = date_and_place[1].get_text(strip=True)
+                    
+                    link_element = entry.find_parent("a")
+                    link = link_element["href"]
+                    
+                    items.append({
+                        "norm": f"{title}|{date}|{link}",
+                        "raw": f"{title} | {date} | {place}"
+                    })
             browser.close()
         return items
 
@@ -56,7 +62,8 @@ def load_last_state():
     
     with open(STATE_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
-        # 取得日時の行をスキップ
+        
+        # 収集日時の行をスキップ
         if lines and "収集日時:" in lines[0]:
             lines = lines[1:]
         
