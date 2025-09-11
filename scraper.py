@@ -74,14 +74,13 @@ def save_state(items):
         f.write(f"収集日時: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write("\n".join([item["norm"] for item in items]))
 
-def notify_discord(message, use_timestamp=False):
+def notify_discord(message):
     try:
-        if use_timestamp:
-            jst = timezone(timedelta(hours=9))
-            jst_time = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
-            message = f"{message} (タイムスタンプ: {jst_time})"
+        jst = timezone(timedelta(hours=9))
+        jst_time = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
         
-        requests.post(WEBHOOK_URL, json={"content": message})
+        notification_message = f"{message}\n\n（情報収集日時: {jst_time}）"
+        requests.post(WEBHOOK_URL, json={"content": notification_message})
     except Exception as e:
         print(f"Error sending Discord notification: {e}")
 
@@ -107,7 +106,7 @@ def main():
         print("  データなし")
 
     if new_items_list is None:
-        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）（Gemini）**\nサイトの形式が変更されたか、その他の問題が発生しました。", use_timestamp=True)
+        notify_discord(f"🔴 **スクレイピング失敗**\nサイトの形式が変更されたか、その他の問題が発生しました。")
         return
 
     new_set = set(item["norm"] for item in new_items_list)
