@@ -39,9 +39,7 @@ def get_page_items():
                     link = link_element["href"]
                     
                     items.append({
-                        # 比較用データ (イベント名と日付)
                         "norm": f"{title}|{date}",
-                        # 通知用データ (イベント名、日付、場所)
                         "raw": f"{title} | {date} | {place}"
                     })
             browser.close()
@@ -69,7 +67,6 @@ def load_last_state():
         if lines and "収集日時:" in lines[0]:
             lines = lines[1:]
         
-        # 保存形式を「イベント名|日付|リンク」から「イベント名|日付」に変更
         normalized_lines = []
         for line in lines:
             parts = line.strip().split('|')
@@ -78,9 +75,9 @@ def load_last_state():
         
         return set(normalized_lines)
 
-
 def save_state(items):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
+        # この行を追加して、収集日時を保存
         f.write(f"収集日時: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write("\n".join([item["norm"] for item in items]))
 
