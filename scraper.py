@@ -74,8 +74,19 @@ def load_last_state():
         return set(line.strip() for line in lines)
 
 def save_state(items):
-    with open(STATE_FILE, "w", encoding="utf-8") as f:
-        f.write("\n".join([item["norm"] for item in items]))
+    temp_file = STATE_FILE + ".tmp"
+    try:
+        # 一時ファイルに新しい内容を書き込む
+        with open(temp_file, "w", encoding="utf-8") as f:
+            f.write("\n".join([item["norm"] for item in items]))
+        
+        # 書き込みが成功したら、元のファイルをアトミックに置き換える
+        os.replace(temp_file, STATE_FILE)
+    except Exception as e:
+        print(f"Error saving state to file: {e}")
+        # 失敗した場合は一時ファイルを削除
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
 def notify_discord(message):
     try:
