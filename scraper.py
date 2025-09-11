@@ -127,6 +127,7 @@ def main():
         for item in sorted_diff:
             notify_discord(f"    - {item['raw']}")
 
+    # データ取得が成功した場合のみ、キャッシュを上書き
     save_state(new_items_list)
 
 if __name__ == "__main__":
