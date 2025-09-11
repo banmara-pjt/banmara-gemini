@@ -1,158 +1,124 @@
+import os
 import requests
 from bs4 import BeautifulSoup
-import re
-from datetime import datetime
+from playwright.sync_api import sync_playwright
+from datetime import datetime, timezone, timedelta
 
-# Discord Webhook URL
-WEBHOOK_URL = "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL_HERE" # ここにDiscord Webhook URLを設定
+WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+TARGET_URL = "https://bang-dream.com/events?event_tag=19"
+STATE_FILE = "last_state.txt"
 
-# ウェブページのURL
-url = "https://bang-dream.com/events"
-
-def scrape_events():
-    """ウェブサイトからイベント情報をスクレイピングする"""
+def get_page_items():
+    items = []
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
-        events_section = soup.find("section", class_="c-section-event-list")
-        event_items = events_section.find_all("li", class_="c-section-event-list__item")
-        
-        events = []
-        for item in event_items:
-            title_tag = item.find("h3", class_="c-section-event-list__item__ttl")
-            title = title_tag.text.strip() if title_tag else "タイトルなし"
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            
+            page.goto(TARGET_URL)
+            
+            page.wait_for_selector(".liveEventListInfo", timeout=10000)
 
-            date_tag = item.find("p", class_="c-section-event-list__item__date")
-            date = date_tag.text.strip() if date_tag else ""
+            soup = BeautifulSoup(page.content(), "html.parser")
+            
+            for entry in soup.select(".liveEventListInfo"):
+                title_element = entry.select_one(".liveEventListTitle")
+                
+                date_and_place = entry.select(".itemInfoColumnData")
+                
+                if title_element:
+                    title = title_element.get_text(strip=True)
+                    date = ""
+                    place = ""
+                    
+                    if len(date_and_place) >= 2:
+                        date = date_and_place[0].get_text(strip=True)
+                        place = date_and_place[1].get_text(strip=True)
+                    
+                    link_element = entry.find_parent("a")
+                    link = link_element["href"]
+                    
+                    items.append({
+                        "norm": f"{title}|{date}|{link}",
+                        "raw": f"{title} | {date} | {place}"
+                    })
+            browser.close()
+        return items
 
-            location_tag = item.find("p", class_="c-section-event-list__item__place")
-            location = location_tag.text.strip() if location_tag else ""
-
-            link_tag = item.find("a", class_="c-section-event-list__item__link")
-            link = link_tag['href'] if link_tag and 'href' in link_tag.attrs else ""
-
-            events.append({
-                "title": title,
-                "date": date,
-                "location": location,
-                "link": link
-            })
-        return events
     except Exception as e:
-        print(f"スクレイピング中にエラーが発生しました: {e}")
+        print(f"An error occurred during scraping: {e}")
         return None
 
-def format_event_for_file(event):
-    """イベント情報をファイル保存用にフォーマットする"""
-    return f"{event['title']}|{event['date']}|{event['link']}"
-
-def format_event_for_discord(event):
-    """イベント情報をDiscord通知用にフォーマットする"""
-    return f"- **{event['title']}**\n  - 日程: {event['date']}\n  - 場所: {event['location']}\n  - 詳細: {urljoin(url, event['link']) if event['link'] else 'なし'}"
-
-def urljoin(base, url_path):
-    """ベースURLと相対パスを結合する"""
-    if url_path.startswith('/'):
-        return base.split('/events')[0] + url_path
-    return url_path
-
-def send_discord_notification(message, username="イベント通知Bot"):
-    """Discordに通知を送る"""
-    payload = {
-        "content": message,
-        "username": username
-    }
-    requests.post(WEBHOOK_URL, json=payload)
-
-def load_last_state(file_path="last_state.txt"):
-    """前回保存したイベント情報をファイルから読み込む"""
-    events = {}
-    last_scrape_time = None
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            if lines and lines[0].startswith("収集日時:"):
-                time_str = lines[0].replace("収集日時: ", "").strip()
-                last_scrape_time = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
-                lines = lines[1:]
-            
-            for line in lines:
-                parts = line.strip().split("|")
-                if len(parts) >= 3:
-                    title, date, link = parts[0], parts[1], parts[2]
-                    events[title] = {"date": date, "link": link}
-    except FileNotFoundError:
-        print("前回保存されたファイルが見つかりません。")
-    except Exception as e:
-        print(f"ファイル読み込み中にエラーが発生しました: {e}")
+def load_last_state():
+    if not os.path.exists(STATE_FILE):
+        return set()
     
-    return events, last_scrape_time
+    # === デバッグ用 ===
+    print("\n--- last_state.txtの内容 ---")
+    with open(STATE_FILE, "r", encoding="utf-8") as f:
+        print(f.read())
+    print("------------------------")
+    # === デバッグ終了 ===
+    
+    with open(STATE_FILE, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+        return set(line.strip() for line in lines)
 
-def save_current_state(events, file_path="last_state.txt"):
-    """現在のイベント情報をファイルに保存する"""
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(f"収集日時: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        for event in events:
-            f.write(format_event_for_file(event) + "\n")
+def save_state(items):
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join([item["norm"] for item in items]))
+
+def notify_discord(message):
+    try:
+        jst = timezone(timedelta(hours=9))
+        jst_time = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
+        
+        notification_message = f"{message} (タイムスタンプ: {jst_time})"
+        requests.post(WEBHOOK_URL, json={"content": notification_message})
+    except Exception as e:
+        print(f"Error sending Discord notification: {e}")
 
 def main():
-    last_state, last_scrape_time = load_last_state()
-    current_events = scrape_events()
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_items_list = get_page_items()
+    old_items = load_last_state()
+
+    print("--- 収集ログ（収集日時: {}） ---".format(current_time))
     
-    if current_events is None:
-        print("スクレイピングに失敗したため、処理を中断します。")
+    print("\n--- 今回取得したデータ ---")
+    if new_items_list:
+        for item in new_items_list:
+            print(f"  - {item['raw']}")
+    else:
+        print("  データなし")
+        
+    print("\n--- 前回保存されていたデータ ---")
+    if old_items:
+        for item in old_items:
+            print(f"  - {item}")
+    else:
+        print("  データなし")
+
+    if new_items_list is None:
+        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）（Gemini）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
         return
 
-    # 差分を検出
-    new_events = []
-    if last_state:
-        last_state_set = {f"{k}|{v['date']}|{v['link']}" for k, v in last_state.items()}
-    else:
-        last_state_set = set()
+    new_set = set(item["norm"] for item in new_items_list)
+    old_set = set(old_items)
+    diff_norms = new_set - old_set
+    diff_items = [item for item in new_items_list if item["norm"] in diff_norms]
 
-    current_events_set = {format_event_for_file(e) for e in current_events}
-    new_events_data = current_events_set - last_state_set
-    
-    for event_str in new_events_data:
-        parts = event_str.split("|")
-        if len(parts) >= 3:
-            title, date, link = parts[0], parts[1], parts[2]
-            for event in current_events:
-                if event['title'] == title and event['date'] == date:
-                    new_events.append(event)
-                    break
-    
-    # ログ出力
-    print("\n--- last_state.txtの内容 ---")
-    if last_scrape_time:
-        print(f"収集日時: {last_scrape_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    if not diff_items and new_items_list:
+        notify_discord(f"✅ **正常に動作しています（新着情報はありません）（収集日時：{current_time}）（Gemini）**")
+    elif not new_items_list:
+        notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）（Gemini）**")
     else:
-        print("前回保存されたファイルが見つかりません。")
-    if last_state:
-        for title, info in last_state.items():
-            print(f"{title}|{info['date']}|{info['link']}")
-    print("------------------------")
-    print(f"--- 収集ログ（収集日時: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}） ---")
-    print("\n--- 今回取得したデータ ---")
-    for event in current_events:
-        print(f"  - {event['title']} | {event['date']} | {event['location']}")
-    
-    print("\n--- 前回保存されていたデータ ---")
-    if last_state:
-        for event in last_state.items():
-            title, info = event
-            print(f"  - {title}|{info['date']}|{info['link']}")
-    else:
-        print("前回保存されたデータがありません。")
-    print("------------------------")
+        sorted_diff = sorted(list(diff_items), key=lambda x: x['raw'])
+        notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）（Gemini）**")
+        for item in sorted_diff:
+            notify_discord(f"    - {item['raw']}")
 
-    # Discord通知
-    if new_events:
-        message = "新しいイベント情報が公開されました！\n\n"
-        for event in new_events:
-            message += format_event_for_discord(event) + "\n"
-        send_discord_notification(message)
-        print("新しいイベント情報をDiscordに送信しました。")
-    else:
-        print("新しいイベント情報はありませんでした
+    save_state(new_items_list)
+
+if __name__ == "__main__":
+    main()
