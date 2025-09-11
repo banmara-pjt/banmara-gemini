@@ -38,8 +38,9 @@ def get_page_items():
                     link_element = entry.find_parent("a")
                     link = link_element["href"]
                     
+                    # 比較用と通知用のデータを同じ形式にする
                     items.append({
-                        "norm": f"{title}|{date}",
+                        "norm": f"{title}|{date}|{link}",
                         "raw": f"{title} | {date} | {place}"
                     })
             browser.close()
@@ -67,13 +68,8 @@ def load_last_state():
         if lines and "収集日時:" in lines[0]:
             lines = lines[1:]
         
-        normalized_lines = []
-        for line in lines:
-            parts = line.strip().split('|')
-            if len(parts) >= 2:
-                normalized_lines.append(f"{parts[0]}|{parts[1]}")
-        
-        return set(normalized_lines)
+        # 保存形式をそのまま読み込む
+        return set(line.strip() for line in lines)
 
 def save_state(items):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
