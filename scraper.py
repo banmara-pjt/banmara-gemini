@@ -39,8 +39,9 @@ def get_page_items():
                     link = link_element["href"]
                     
                     items.append({
-                        # この行を修正
+                        # 比較用データ (イベント名と日付)
                         "norm": f"{title}|{date}",
+                        # 通知用データ (イベント名、日付、場所)
                         "raw": f"{title} | {date} | {place}"
                     })
             browser.close()
