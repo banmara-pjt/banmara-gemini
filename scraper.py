@@ -38,11 +38,18 @@ def get_page_items():
                     link_element = entry.find_parent("a")
                     link = link_element["href"]
                     
-                    # 比較用と通知用のデータを同じ形式にする
                     items.append({
                         "norm": f"{title}|{date}|{link}",
                         "raw": f"{title} | {date} | {place}"
                     })
+
+            # 収集日時をイベントデータと同じ形式で追加
+            current_time_str = datetime.now().strftime("%Y年%m月%d日 %H:%M:%S")
+            items.append({
+                "norm": f"収集日時|{current_time_str}|/log",
+                "raw": f"収集日時 | {current_time_str} |"
+            })
+            
             browser.close()
         return items
 
@@ -64,17 +71,10 @@ def load_last_state():
     with open(STATE_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
         
-        # 収集日時の行をスキップ
-        if lines and "収集日時:" in lines[0]:
-            lines = lines[1:]
-        
-        # 保存形式をそのまま読み込む
         return set(line.strip() for line in lines)
 
 def save_state(items):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
-        # この行を追加して、収集日時を保存
-        f.write(f"収集日時: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write("\n".join([item["norm"] for item in items]))
 
 def notify_discord(message):
