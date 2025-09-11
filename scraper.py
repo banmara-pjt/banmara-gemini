@@ -1,131 +1,41 @@
-import os
-import requests
-from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
-from datetime import datetime, timezone, timedelta
+name: scrape
 
-WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
-TARGET_URL = "https://bang-dream.com/events?event_tag=19"
-STATE_FILE = "last_state.txt"
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
 
-def get_page_items():
-    items = []
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            
-            page.goto(TARGET_URL)
-            
-            page.wait_for_selector(".liveEventListInfo", timeout=10000)
+jobs:
+  scrape-and-notify:
+    runs-on: ubuntu-latest
 
-            soup = BeautifulSoup(page.content(), "html.parser")
-            
-            for entry in soup.select(".liveEventListInfo"):
-                title_element = entry.select_one(".liveEventListTitle")
-                
-                date_and_place = entry.select(".itemInfoColumnData")
-                
-                if title_element:
-                    title = title_element.get_text(strip=True)
-                    date = ""
-                    place = ""
-                    
-                    if len(date_and_place) >= 2:
-                        date = date_and_place[0].get_text(strip=True)
-                        place = date_and_place[1].get_text(strip=True)
-                    
-                    link_element = entry.find_parent("a")
-                    link = link_element["href"]
-                    
-                    items.append({
-                        "norm": f"{title}|{date}|{link}",
-                        "raw": f"{title} | {date} | {place}"
-                    })
-            browser.close()
-        return items
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    except Exception as e:
-        print(f"An error occurred during scraping: {e}")
-        return None
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          cache: 'pip'
 
-def load_last_state():
-    if not os.path.exists(STATE_FILE):
-        return set()
-    
-    # === デバッグ用 ===
-    print("\n--- last_state.txtの内容 ---")
-    with open(STATE_FILE, "r", encoding="utf-8") as f:
-        print(f.read())
-    print("------------------------")
-    # === デバッグ終了 ===
-    
-    with open(STATE_FILE, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-        
-        # 収集日時の行をスキップ
-        if lines and "収集日時:" in lines[0]:
-            lines = lines[1:]
-        
-        return set(line.strip() for line in lines)
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
 
-def save_state(items):
-    with open(STATE_FILE, "w", encoding="utf-8") as f:
-        f.write(f"収集日時: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write("\n".join([item["norm"] for item in items]))
+      - name: Cache last_state.txt
+        uses: actions/cache@v3
+        with:
+          path: last_state.txt
+          key: ${{ runner.os }}-last-events-v2
+          restore-keys: |
+            ${{ runner.os }}-last-events-
 
-def notify_discord(message, use_timestamp=False):
-    try:
-        if use_timestamp:
-            jst = timezone(timedelta(hours=9))
-            jst_time = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
-            message = f"{message} (タイムスタンプ: {jst_time})"
-        
-        requests.post(WEBHOOK_URL, json={"content": message})
-    except Exception as e:
-        print(f"Error sending Discord notification: {e}")
-
-def main():
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_items_list = get_page_items()
-    old_items = load_last_state()
-
-    print("--- 収集ログ（収集日時: {}） ---".format(current_time))
-    
-    print("\n--- 今回取得したデータ ---")
-    if new_items_list:
-        for item in new_items_list:
-            print(f"  - {item['raw']}")
-    else:
-        print("  データなし")
-        
-    print("\n--- 前回保存されていたデータ ---")
-    if old_items:
-        for item in old_items:
-            print(f"  - {item}")
-    else:
-        print("  データなし")
-
-    if new_items_list is None:
-        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）（Gemini）**\nサイトの形式が変更されたか、その他の問題が発生しました。", use_timestamp=True)
-        return
-
-    new_set = set(item["norm"] for item in new_items_list)
-    old_set = set(old_items)
-    diff_norms = new_set - old_set
-    diff_items = [item for item in new_items_list if item["norm"] in diff_norms]
-
-    if not diff_items and new_items_list:
-        notify_discord(f"✅ **正常に動作しています（新着情報はありません）**")
-    elif not new_items_list:
-        notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）**")
-    else:
-        sorted_diff = sorted(list(diff_items), key=lambda x: x['raw'])
-        notify_discord(f"📢 **新着情報が見つかりました**")
-        for item in sorted_diff:
-            notify_discord(f"    - {item['raw']}")
-
-    save_state(new_items_list)
-
-if __name__ == "__main__":
-    main()
+      - name: Run python scraper.py
+        run: python scraper.py
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
