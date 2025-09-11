@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 from datetime import datetime, timezone, timedelta
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
-TARGET_URL = "https://bang-dream.com/events?event_tag=19"
+TARGET_URL = "https://bang-dream.com/events"
 STATE_FILE = "last_state.txt"
 
 def get_page_items():
@@ -17,31 +17,25 @@ def get_page_items():
             
             page.goto(TARGET_URL)
             
-            page.wait_for_selector(".liveEventListInfo", timeout=10000)
+            page.wait_for_selector(".c-section-event-list", timeout=10000)
 
             soup = BeautifulSoup(page.content(), "html.parser")
             
-            for entry in soup.select(".liveEventListInfo"):
-                title_element = entry.select_one(".liveEventListTitle")
+            for entry in soup.select(".c-section-event-list__item"):
+                title_element = entry.select_one(".c-section-event-list__item__ttl")
+                date_element = entry.select_one(".c-section-event-list__item__date")
+                place_element = entry.select_one(".c-section-event-list__item__place")
+                link_element = entry.select_one(".c-section-event-list__item__link")
                 
-                date_and_place = entry.select(".itemInfoColumnData")
+                title = title_element.get_text(strip=True) if title_element else ""
+                date = date_element.get_text(strip=True) if date_element else ""
+                place = place_element.get_text(strip=True) if place_element else ""
+                link = link_element["href"] if link_element and "href" in link_element.attrs else ""
                 
-                if title_element:
-                    title = title_element.get_text(strip=True)
-                    date = ""
-                    place = ""
-                    
-                    if len(date_and_place) >= 2:
-                        date = date_and_place[0].get_text(strip=True)
-                        place = date_and_place[1].get_text(strip=True)
-                    
-                    link_element = entry.find_parent("a")
-                    link = link_element["href"]
-                    
-                    items.append({
-                        "norm": f"{title}|{date}|{link}",
-                        "raw": f"{title} | {date} | {place}"
-                    })
+                items.append({
+                    "norm": f"{title}|{date}|{link}",
+                    "raw": f"{title} | {date} | {place}"
+                })
             browser.close()
         return items
 
@@ -62,19 +56,25 @@ def load_last_state():
     
     with open(STATE_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
+        # 取得日時の行をスキップ
+        if lines and "収集日時:" in lines[0]:
+            lines = lines[1:]
+        
         return set(line.strip() for line in lines)
 
 def save_state(items):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
+        f.write(f"収集日時: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write("\n".join([item["norm"] for item in items]))
 
-def notify_discord(message):
+def notify_discord(message, use_timestamp=False):
     try:
-        jst = timezone(timedelta(hours=9))
-        jst_time = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
+        if use_timestamp:
+            jst = timezone(timedelta(hours=9))
+            jst_time = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
+            message = f"{message} (タイムスタンプ: {jst_time})"
         
-        notification_message = f"{message} (タイムスタンプ: {jst_time})"
-        requests.post(WEBHOOK_URL, json={"content": notification_message})
+        requests.post(WEBHOOK_URL, json={"content": message})
     except Exception as e:
         print(f"Error sending Discord notification: {e}")
 
@@ -100,7 +100,7 @@ def main():
         print("  データなし")
 
     if new_items_list is None:
-        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）（Gemini）**\nサイトの形式が変更されたか、その他の問題が発生しました。")
+        notify_discord(f"🔴 **スクレイピング失敗（収集日時：{current_time}）（Gemini）**\nサイトの形式が変更されたか、その他の問題が発生しました。", use_timestamp=True)
         return
 
     new_set = set(item["norm"] for item in new_items_list)
@@ -109,12 +109,12 @@ def main():
     diff_items = [item for item in new_items_list if item["norm"] in diff_norms]
 
     if not diff_items and new_items_list:
-        notify_discord(f"✅ **正常に動作しています（新着情報はありません）（収集日時：{current_time}）（Gemini）**")
+        notify_discord(f"✅ **正常に動作しています（新着情報はありません）**")
     elif not new_items_list:
-        notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）（収集日時：{current_time}）（Gemini）**")
+        notify_discord(f"⚠️ **警告：データ件数がゼロでした（サイト要確認）**")
     else:
         sorted_diff = sorted(list(diff_items), key=lambda x: x['raw'])
-        notify_discord(f"📢 **新着情報が見つかりました（収集日時：{current_time}）（Gemini）**")
+        notify_discord(f"📢 **新着情報が見つかりました**")
         for item in sorted_diff:
             notify_discord(f"    - {item['raw']}")
 
