@@ -39,7 +39,8 @@ def get_page_items():
                     link = link_element["href"]
                     
                     items.append({
-                        "norm": f"{title}|{date}|{link}",
+                        # この行を修正
+                        "norm": f"{title}|{date}",
                         "raw": f"{title} | {date} | {place}"
                     })
             browser.close()
